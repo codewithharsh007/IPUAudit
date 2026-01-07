@@ -31,8 +31,40 @@ const academicAuditSchema = new mongoose.Schema(
       type: Number,
       default: 1,
       min: [1, "Step cannot be less than 1"],
-      max: [17, "Step cannot be greater than 17"],
+      max: [18, "Step cannot be greater than 18"], // ✅ Fixed to 18
     },
+
+    // ✅ NEW: Track completed sections
+    completedSections: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: function (sections) {
+          const validSections = [
+            "instituteInfo",
+            "academicPrograms",
+            "accreditation",
+            "teachersAvailability",
+            "qualityOfTeachers",
+            "facultyDevelopment",
+            "grievanceRedressal",
+            "universityExaminations",
+            "library",
+            "laboratories",
+            "coCurricularActivities",
+            "publications",
+            "studentDevelopment",
+            "placement",
+            "generalParameters",
+            "feedback",
+            "deficiencies",
+          ];
+          return sections.every((s) => validSections.includes(s));
+        },
+        message: "Invalid section in completedSections array",
+      },
+    },
+
     lastUpdated: {
       type: Date,
       default: Date.now,
@@ -327,15 +359,7 @@ const academicAuditSchema = new mongoose.Schema(
       documents: [String],
     },
 
-    // PDF Upload Option
-    directPDFUpload: {
-      uploaded: { type: Boolean, default: false },
-      fileUrl: String,
-      publicId: String,
-      fileName: String,
-      uploadedAt: Date,
-    },
-
+    // Submission tracking
     submittedAt: Date,
     submittedBy: String,
 
@@ -348,8 +372,8 @@ const academicAuditSchema = new mongoose.Schema(
     reviewComments: String,
   },
   {
-    timestamps: true, // ✅ Automatic createdAt and updatedAt
-    toJSON: { virtuals: true }, // ✅ Enable virtuals in JSON
+    timestamps: true,
+    toJSON: { virtuals: true },
     toObject: { virtuals: true },
   },
 );
@@ -360,48 +384,23 @@ academicAuditSchema.index({ status: 1 });
 academicAuditSchema.index({ submittedAt: -1 });
 academicAuditSchema.index({ "instituteInfo.institutionName": "text" });
 
-// ✅ Virtual fields
+// ✅ Virtual: Check if audit is editable
 academicAuditSchema.virtual("isEditable").get(function () {
   return this.status === "draft" || this.status === "rejected";
 });
 
+// ✅ Virtual: Calculate completion percentage based on completedSections
 academicAuditSchema.virtual("completionPercentage").get(function () {
-  const sections = [
-    "academicPrograms",
-    "accreditation",
-    "teachersAvailability",
-    "qualityOfTeachers",
-    "facultyDevelopment",
-    "grievanceRedressal",
-    "universityExaminations",
-    "library",
-    "laboratories",
-    "coCurricularActivities",
-    "publications",
-    "studentDevelopment",
-    "placement",
-    "generalParameters",
-    "feedback",
-    "deficiencies",
-  ];
-
-  const completed = sections.filter((section) => {
-    const data = this[section];
-    return (
-      data &&
-      ((Array.isArray(data) && data.length > 0) ||
-        (typeof data === "object" && Object.keys(data).length > 0))
-    );
-  }).length;
-
-  return Math.round((completed / sections.length) * 100);
+  const totalSections = 17; // Total number of sections (excluding summary)
+  const completed = this.completedSections?.length || 0;
+  return Math.round((completed / totalSections) * 100);
 });
 
-// ✅ FIXED: Pre-save middleware - ASYNC version (no next needed)
+// ✅ Pre-save middleware
 academicAuditSchema.pre("save", async function () {
   // Update lastUpdated
   this.lastUpdated = new Date();
-  
+
   // Validate status transitions
   if (this.isModified("status") && this._original) {
     const validTransitions = {
@@ -416,18 +415,31 @@ academicAuditSchema.pre("save", async function () {
 
     if (!validTransitions[originalStatus]?.includes(newStatus)) {
       throw new Error(
-        `Invalid status transition from ${originalStatus} to ${newStatus}`
+        `Invalid status transition from ${originalStatus} to ${newStatus}`,
       );
     }
   }
-  // ✅ No next() call needed in async functions
 });
-
 
 // Track original document for status validation
 academicAuditSchema.post("init", function (doc) {
   doc._original = doc.toObject();
 });
+
+// ✅ Method to check if a specific section is completed
+academicAuditSchema.methods.isSectionCompleted = function (sectionKey) {
+  return this.completedSections?.includes(sectionKey) || false;
+};
+
+// ✅ Method to mark a section as completed
+academicAuditSchema.methods.markSectionCompleted = function (sectionKey) {
+  if (!this.completedSections) {
+    this.completedSections = [];
+  }
+  if (!this.completedSections.includes(sectionKey)) {
+    this.completedSections.push(sectionKey);
+  }
+};
 
 export default mongoose.models.AcademicAudit ||
   mongoose.model("AcademicAudit", academicAuditSchema);

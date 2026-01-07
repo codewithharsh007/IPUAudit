@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import {
+  InstituteInfoForm,
   AcademicProgramsForm,
   AccreditationForm,
   TeachersAvailabilityForm,
@@ -23,7 +24,6 @@ import {
   FeedbackForm,
   DeficienciesForm,
   SummaryReviewForm,
-  DirectPDFUpload,
 } from "@/components/AcademicAudit";
 
 export default function AcademicAuditPage() {
@@ -36,7 +36,6 @@ export default function AcademicAuditPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [academicYear, setAcademicYear] = useState("2024-25");
-  const [showPDFUpload, setShowPDFUpload] = useState(false);
   const [error, setError] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
 
@@ -44,124 +43,148 @@ export default function AcademicAuditPage() {
   const sections = [
     {
       id: 1,
+      key: "instituteInfo",
+      name: "Institute Information",
+      component: InstituteInfoForm,
+      maxMarks: 0,
+    },
+    {
+      id: 2,
       key: "academicPrograms",
       name: "Academic Programs",
       component: AcademicProgramsForm,
       maxMarks: 0,
     },
     {
-      id: 2,
+      id: 3,
       key: "accreditation",
       name: "Accreditation Status",
       component: AccreditationForm,
       maxMarks: 50,
     },
     {
-      id: 3,
+      id: 4,
       key: "teachersAvailability",
       name: "Teachers Availability",
       component: TeachersAvailabilityForm,
       maxMarks: 115,
     },
     {
-      id: 4,
+      id: 5,
       key: "qualityOfTeachers",
       name: "Quality of Teachers",
       component: QualityOfTeachersForm,
       maxMarks: 100,
     },
     {
-      id: 5,
+      id: 6,
       key: "facultyDevelopment",
       name: "Faculty Development",
       component: FacultyDevelopmentForm,
       maxMarks: 40,
     },
     {
-      id: 6,
+      id: 7,
       key: "grievanceRedressal",
       name: "Grievance Redressal",
       component: GrievanceRedressalForm,
       maxMarks: 100,
     },
     {
-      id: 7,
+      id: 8,
       key: "universityExaminations",
       name: "University Examinations",
       component: UniversityExaminationsForm,
       maxMarks: 30,
     },
     {
-      id: 8,
+      id: 9,
       key: "library",
       name: "Library",
       component: LibraryForm,
       maxMarks: 100,
     },
     {
-      id: 9,
+      id: 10,
       key: "laboratories",
       name: "Laboratories",
       component: LaboratoriesForm,
       maxMarks: 100,
     },
     {
-      id: 10,
+      id: 11,
       key: "coCurricularActivities",
       name: "Co-Curricular Activities",
       component: CoCurricularActivitiesForm,
       maxMarks: 100,
     },
     {
-      id: 11,
+      id: 12,
       key: "publications",
       name: "Publications",
       component: PublicationsForm,
       maxMarks: 40,
     },
     {
-      id: 12,
+      id: 13,
       key: "studentDevelopment",
       name: "Student Development",
       component: StudentDevelopmentForm,
       maxMarks: 35,
     },
     {
-      id: 13,
+      id: 14,
       key: "placement",
       name: "Placement",
       component: PlacementForm,
       maxMarks: 60,
     },
     {
-      id: 14,
+      id: 15,
       key: "generalParameters",
       name: "General Parameters",
       component: GeneralParametersForm,
       maxMarks: 30,
     },
     {
-      id: 15,
+      id: 16,
       key: "feedback",
       name: "Feedback",
       component: FeedbackForm,
       maxMarks: 50,
     },
     {
-      id: 16,
+      id: 17,
       key: "deficiencies",
       name: "Deficiencies",
       component: DeficienciesForm,
       maxMarks: 50,
     },
     {
-      id: 17,
+      id: 18,
       key: "summary",
       name: "Review & Submit",
       component: SummaryReviewForm,
       maxMarks: 0,
     },
   ];
+
+  // ✅ NEW: Check if section is completed based on completedSections array
+  const isSectionCompleted = (section) => {
+    if (!auditData || !auditData.completedSections) return false;
+    return auditData.completedSections.includes(section.key);
+  };
+
+  // ✅ Get list of completed sections
+  const getCompletedSections = () => {
+    if (!auditData || !auditData.completedSections) return [];
+    return sections.filter((s) => auditData.completedSections.includes(s.key));
+  };
+
+  // ✅ Calculate highest accessible step
+  const getHighestAccessibleStep = () => {
+    return Math.max(currentStep, auditData?.currentStep || 1);
+  };
 
   // Check authentication
   useEffect(() => {
@@ -195,8 +218,8 @@ export default function AcademicAuditPage() {
       const response = await fetch(
         `/api/college/academic-audit/save?year=${academicYear}`,
         {
-          credentials: "include", // ✅ Add this
-        },
+          credentials: "include",
+        }
       );
 
       if (response.ok) {
@@ -208,7 +231,6 @@ export default function AcademicAuditPage() {
           setCurrentStep(data.audit.currentStep || 1);
         }
       } else if (response.status === 404) {
-        // ✅ This is OK - no audit exists yet
         console.log("ℹ️ No existing audit found, starting fresh");
         setAuditData(null);
         setAuditId(null);
@@ -235,20 +257,37 @@ export default function AcademicAuditPage() {
       console.log(
         "💾 Saving section:",
         currentSection.key,
-        "with data:",
-        sectionData,
+        "Action:",
+        action,
+        "Data:",
+        sectionData
       );
+
+      // Calculate next step
+      const nextStep =
+        action === "saveAndContinue" ? currentStep + 1 : currentStep;
+
+      // ✅ Update completedSections array when "Save & Continue"
+      let completedSections = auditData?.completedSections || [];
+      
+      if (action === "saveAndContinue") {
+        // Add current section to completed if not already there
+        if (!completedSections.includes(currentSection.key)) {
+          completedSections = [...completedSections, currentSection.key];
+          console.log(`✅ Marking ${currentSection.key} as COMPLETED`);
+        }
+      }
 
       const response = await fetch("/api/college/academic-audit/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ Add this
+        credentials: "include",
         body: JSON.stringify({
           academicYear,
           section: currentSection.key,
           data: sectionData,
-          currentStep:
-            action === "saveAndContinue" ? currentStep + 1 : currentStep,
+          currentStep: Math.max(nextStep, auditData?.currentStep || 1),
+          completedSections, // ✅ Send updated completed sections
           auditId: auditId,
         }),
       });
@@ -262,12 +301,15 @@ export default function AcademicAuditPage() {
       const result = await response.json();
       console.log("✅ Section saved successfully:", result);
 
+      // Update the ENTIRE audit data state
       setAuditData(result.audit);
       setAuditId(result.audit._id || result.audit.id);
       setLastSaved(new Date());
 
+      // Move to next step only if "Save & Continue"
       if (action === "saveAndContinue" && currentStep < sections.length) {
-        setCurrentStep(currentStep + 1);
+        console.log(`📍 Moving from step ${currentStep} to ${nextStep}`);
+        setCurrentStep(nextStep);
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
@@ -296,7 +338,7 @@ export default function AcademicAuditPage() {
       const response = await fetch("/api/college/academic-audit/submit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // ✅ Add this
+        credentials: "include",
         body: JSON.stringify({ auditId }),
       });
 
@@ -327,16 +369,14 @@ export default function AcademicAuditPage() {
   };
 
   const handleStepClick = (stepId) => {
-    if (stepId <= (auditData?.currentStep || 1) || stepId <= currentStep) {
+    const highestAccessible = getHighestAccessibleStep();
+
+    // Allow navigation to any completed step or accessible step
+    if (stepId <= highestAccessible || isSectionCompleted(sections[stepId - 1])) {
+      console.log(`📍 Navigating to step ${stepId}`);
       setCurrentStep(stepId);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
-  };
-
-  const handlePDFUploadSuccess = async () => {
-    await fetchAuditData();
-    setShowPDFUpload(false);
-    alert("PDF uploaded successfully!");
   };
 
   // Loading state
@@ -358,19 +398,20 @@ export default function AcademicAuditPage() {
 
   const currentSection = sections[currentStep - 1];
   const CurrentStepComponent = currentSection.component;
-  const completedSections = sections.filter(
-    (s) => s.id < currentStep && auditData?.[s.key],
-  ).length;
+
+  // ✅ Calculate progress based on completedSections array
+  const completedSections = getCompletedSections();
   const progressPercentage = (
-    (completedSections / sections.length) *
+    (completedSections.length / sections.length) *
     100
   ).toFixed(0);
+  const highestAccessibleStep = getHighestAccessibleStep();
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
       <Navbar role="college" onLogout={logout} />
 
-      <div className="flex-grow">
+      <div className="grow">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
           {/* Header */}
           <div className="mb-6">
@@ -389,7 +430,7 @@ export default function AcademicAuditPage() {
                 )}
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="flex items-center">
                 <select
                   value={academicYear}
                   onChange={(e) => setAcademicYear(e.target.value)}
@@ -400,14 +441,6 @@ export default function AcademicAuditPage() {
                   <option value="2025-26">2025-26</option>
                   <option value="2026-27">2026-27</option>
                 </select>
-
-                <button
-                  onClick={() => setShowPDFUpload(!showPDFUpload)}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
-                  disabled={saving}
-                >
-                  {showPDFUpload ? "📝 Fill Form" : "📄 Upload PDF"}
-                </button>
               </div>
             </div>
 
@@ -415,7 +448,10 @@ export default function AcademicAuditPage() {
             <div className="mt-6">
               <div className="flex items-center justify-between text-sm text-gray-600">
                 <span>Overall Progress</span>
-                <span className="font-medium">{progressPercentage}%</span>
+                <span className="font-medium">
+                  {completedSections.length} / {sections.length} (
+                  {progressPercentage}%)
+                </span>
               </div>
               <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
                 <div
@@ -430,7 +466,7 @@ export default function AcademicAuditPage() {
           {error && (
             <div className="mb-6 rounded-lg border-l-4 border-red-500 bg-red-50 p-4">
               <div className="flex">
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <svg
                     className="h-5 w-5 text-red-400"
                     viewBox="0 0 20 20"
@@ -469,82 +505,68 @@ export default function AcademicAuditPage() {
             </div>
           )}
 
-          {showPDFUpload ? (
-            <DirectPDFUpload
-              auditData={auditData}
-              academicYear={academicYear}
-              onSuccess={handlePDFUploadSuccess}
-              onCancel={() => setShowPDFUpload(false)}
+          {/* Progress Steps */}
+          <div className="mb-6">
+            <div className="flex flex-wrap gap-2">
+              {sections.map((section) => {
+                const isCompleted = isSectionCompleted(section);
+                const isCurrent = section.id === currentStep;
+                const isAccessible = section.id <= highestAccessibleStep || isCompleted;
+
+                return (
+                  <button
+                    key={section.id}
+                    onClick={() => handleStepClick(section.id)}
+                    disabled={!isAccessible}
+                    className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                      isCurrent
+                        ? "bg-indigo-600 text-white shadow-lg"
+                        : isCompleted
+                          ? "bg-green-100 text-green-800 hover:bg-green-200"
+                          : isAccessible
+                            ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                            : "cursor-not-allowed bg-gray-100 text-gray-400"
+                    }`}
+                  >
+                    <span className="font-bold">{section.id}.</span>
+                    <span>{section.name}</span>
+                    {isCompleted && <span className="text-green-600">✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Current Step Form */}
+          <div className="rounded-lg bg-white p-4 shadow-lg sm:p-6">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
+                  {currentSection.name}
+                </h2>
+                {currentSection.maxMarks > 0 && (
+                  <p className="mt-1 text-sm text-gray-600">
+                    Maximum Marks: {currentSection.maxMarks}
+                  </p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-600">
+                  Step {currentStep} of {sections.length}
+                </p>
+              </div>
+            </div>
+
+            <CurrentStepComponent
+              data={auditData}
+              onSave={handleSave}
+              onPrevious={handlePrevious}
+              onSubmit={handleSubmit}
+              isFirstStep={currentStep === 1}
+              isLastStep={currentStep === sections.length}
+              saving={saving}
             />
-          ) : (
-            <>
-              {/* Progress Steps */}
-              <div className="mb-6">
-                <div className="flex flex-wrap gap-2">
-                  {sections.map((section) => {
-                    const isCompleted = section.id < currentStep;
-                    const isCurrent = section.id === currentStep;
-                    const isAccessible =
-                      section.id <= (auditData?.currentStep || 1);
-
-                    return (
-                      <button
-                        key={section.id}
-                        onClick={() => handleStepClick(section.id)}
-                        disabled={!isAccessible && !isCurrent}
-                        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                          isCurrent
-                            ? "bg-indigo-600 text-white shadow-lg"
-                            : isCompleted
-                              ? "bg-green-100 text-green-800 hover:bg-green-200"
-                              : isAccessible
-                                ? "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                : "cursor-not-allowed bg-gray-100 text-gray-400"
-                        }`}
-                      >
-                        <span className="font-bold">{section.id}.</span>
-                        <span>{section.name}</span>
-                        {isCompleted && (
-                          <span className="text-green-600">✓</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Current Step Form */}
-              <div className="rounded-lg bg-white p-4 shadow-lg sm:p-6">
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
-                      {currentSection.name}
-                    </h2>
-                    {currentSection.maxMarks > 0 && (
-                      <p className="mt-1 text-sm text-gray-600">
-                        Maximum Marks: {currentSection.maxMarks}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-600">
-                      Step {currentStep} of {sections.length}
-                    </p>
-                  </div>
-                </div>
-
-                <CurrentStepComponent
-                  data={auditData}
-                  onSave={handleSave}
-                  onPrevious={handlePrevious}
-                  onSubmit={handleSubmit}
-                  isFirstStep={currentStep === 1}
-                  isLastStep={currentStep === sections.length}
-                  saving={saving}
-                />
-              </div>
-            </>
-          )}
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 // Form Components
+export { default as InstituteInfoForm } from "./InstituteInfoForm";
 export { default as AcademicProgramsForm } from "./AcademicProgramsForm";
 export { default as AccreditationForm } from "./AccreditationForm";
 export { default as TeachersAvailabilityForm } from "./TeachersAvailabilityForm";
@@ -18,5 +19,4 @@ export { default as DeficienciesForm } from "./DeficienciesForm";
 export { default as SummaryReviewForm } from "./SummaryReviewForm";
 
 // Utility Components
-export { default as DirectPDFUpload } from "./DirectPDFUpload";
 export { default as FileUpload } from "./FileUpload";
